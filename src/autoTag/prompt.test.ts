@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildAutoTagMessages } from '@/autoTag/prompt';
 import {
   activeComfyPreset,
+  BUILTIN_NAI_COMIC_PRESET,
   settings,
   type AutoTagPrompts,
   type AutoTagSettings,
@@ -979,6 +980,84 @@ describe('auto tag prompt', () => {
       settings.defaultBackend = oldBackend;
       preset.mode = oldMode;
       preset.simple.template = oldTemplate;
+    }
+  });
+
+  it('assembles comic mode prompt messages correctly when comicMode is enabled for NAI', async () => {
+    const options: AutoTagSettings = {
+      enabled: true,
+      comicMode: true,
+      contextMessages: 2,
+      minImages: 1,
+      maxImages: 3,
+      retryCount: 1,
+      autoGenerate: true,
+      prompts: prompts(),
+    };
+    const oldBackend = settings.defaultBackend;
+    try {
+      settings.defaultBackend = 'nai';
+      const messages = await buildAutoTagMessages(context(), 1, options, null);
+
+      expect(messages.some(m => m.content.includes('[ROLE: COMIC-DIRECTOR]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[角色身份、外观与连续性]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[COLOR-MODE: FULL-COLOR]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[RATING-DECISION: SFW]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[PANEL-PACING: SHOUNEN-ACTION]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[GUTTER: BLEED]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[BUBBLE: ADAPTIVE]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('format 固定为 nai5-comic'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[COMIC-PRODUCTION-DIRECTIVE]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('漫画生成页数必须在 1～3 页之间'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[FINAL-OUTPUT-CHECK]'))).toBe(true);
+
+      const last = messages[messages.length - 1];
+      expect(last.role).toBe('assistant');
+      expect(last.content).toContain('<thinking>\n- 角色DNA:');
+    } finally {
+      settings.defaultBackend = oldBackend;
+    }
+  });
+
+  it('respects active variant selection and enabled toggle in comic presets', async () => {
+    const customComicPreset = structuredClone(BUILTIN_NAI_COMIC_PRESET);
+    customComicPreset.id = 'custom_comic_test';
+
+    // Switch colorMode to monochrome and rating to nsfw
+    const colorEntry = customComicPreset.entries.find(e => e.id === 'colorMode')!;
+    colorEntry.activeVariantId = 'monochrome';
+    const ratingEntry = customComicPreset.entries.find(e => e.id === 'rating')!;
+    ratingEntry.activeVariantId = 'nsfw';
+
+    // Disable bubbleStyle entry
+    const bubbleEntry = customComicPreset.entries.find(e => e.id === 'bubbleStyle')!;
+    bubbleEntry.enabled = false;
+
+    const options: AutoTagSettings = {
+      enabled: true,
+      comicMode: true,
+      presets: [customComicPreset],
+      activePresetId: 'custom_comic_test',
+      contextMessages: 2,
+      minImages: 0,
+      maxImages: 2,
+      retryCount: 1,
+      autoGenerate: true,
+      prompts: prompts(),
+    };
+    const oldBackend = settings.defaultBackend;
+    try {
+      settings.defaultBackend = 'nai';
+      const messages = await buildAutoTagMessages(context(), 1, options, null);
+
+      expect(messages.some(m => m.content.includes('[COLOR-MODE: MONOCHROME]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[COLOR-MODE: FULL-COLOR]'))).toBe(false);
+      expect(messages.some(m => m.content.includes('[RATING-DECISION: NSFW]'))).toBe(true);
+      expect(messages.some(m => m.content.includes('[RATING-DECISION: SFW]'))).toBe(false);
+      // bubbleStyle is disabled
+      expect(messages.some(m => m.content.includes('[BUBBLE:'))).toBe(false);
+    } finally {
+      settings.defaultBackend = oldBackend;
     }
   });
 });

@@ -598,7 +598,7 @@ genState 同构(chatId|messageId|swipeId|seq),重建后按 key 认领。手动�
     而名字是用户自己敲的 —— 有人就拿站点域名当名字,带上等于把地址漏进公开返回值
     (`public/api.ts` 的白名单正是为挡这个)。面板自己的 toast 标题不受此限,那是本地 UI。
 - **NAI 画师串库**:`settings.nai.artistPresets`(`NaiArtistPreset[]`)+ `activeArtistId`。
-  一条配方 = 名字 + 画师串(prompt,拼在正向提示词**最前面**) + 可选绑定的正面质量词(quality)
+  一条配方 = 名字 + 备注(desc,可选说明,画师串库内编辑展示并参与搜索) + 画师串(prompt,拼在正向提示词**最前面**) + 可选绑定的正面质量词(quality)
   + 可选绑定的负面提示词(negative);绑定值留空 = 跟随渠道级 → 模型官方词(三级回落,见
   `backends/nai.ts` 的 `naiQualityTags` / `naiUndesiredContent`)。拼装顺序:画师串 → 画面 tag →
   质量词(画师串放最前是因为它定整幅画的基调,NAI 对靠前 tag 权重更高;切换画师串时

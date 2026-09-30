@@ -22,6 +22,7 @@
  * 故 decideSeed 单独导出:调用方先定种子(埋点需要它)、再把它显式传进来。
  */
 
+import type { ComicPageData } from '@/autoTag/comicProtocol';
 import type { ImageCharacterPrompt } from '@/autoTag/protocol';
 import { validateSimpleConfig } from '@/backends/comfyTemplates';
 import { generateComfyImage, randomSeed, type ComfyImageResult } from '@/backends/comfyui';
@@ -40,6 +41,8 @@ export interface GenerateInput {
   negative?: string;
   /** NAI 4.5/V5 原生多角色提示;ComfyUI 不支持(见 charactersApplied)。 */
   characters?: ImageCharacterPrompt[];
+  /** 漫画分镜结构数据(仅 NAI 漫画模式产生) */
+  comic?: ComicPageData;
   /** 画幅方向;缺省竖屏。具体像素取渠道配置里的横竖尺寸。 */
   size?: Orientation;
   /** 本次种子。由调用方经 decideSeed() 先行确定(埋点要在发请求前拿到它)。 */
@@ -186,7 +189,14 @@ export async function generateImage(
           effectiveNai(),
           // characters 原样透传:不支持的模型由 buildNaiParameters 自己滤掉(同一口径
           // naiSupportsCharacterPrompts),在这儿再滤一遍只会多一处会漂的判据
-          { prompt: input.prompt, nl: input.nl ?? '', characters, seed: input.seed, size },
+          {
+            prompt: input.prompt,
+            nl: input.nl ?? '',
+            characters,
+            comic: input.comic,
+            seed: input.seed,
+            size,
+          },
           signal,
           { onRetry: info => progress.onRetry?.({ attempt: info.attempt, max: info.max }) },
         )

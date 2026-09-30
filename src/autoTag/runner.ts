@@ -26,6 +26,7 @@ import {
   type CharTagField,
 } from '@/state/charTags';
 import { injectImageTags, parseImagePlan, type ImagePlan } from '@/autoTag/protocol';
+import { parseComicPlan } from '@/autoTag/comicProtocol';
 import {
   clearAutoGenerateForFloor,
   consumeAutoGenerate,
@@ -337,12 +338,20 @@ async function runForFloor(floor: number, opts: RunOptions = {}): Promise<void> 
         // (直接 let 会被 TS 收窄成 null:闭包内的赋值控制流分析看不见。)
         const parsed: { plan: ImagePlan | null } = { plan: null };
         const validate = (raw: string) => {
-          const candidate = parseImagePlan(
-            raw,
-            preparedTarget.segments,
-            promptOptions.minImages,
-            promptOptions.maxImages,
-          );
+          const candidate =
+            promptOptions.comicMode && settings.defaultBackend === 'nai'
+              ? parseComicPlan(
+                  raw,
+                  preparedTarget.segments,
+                  promptOptions.minImages,
+                  promptOptions.maxImages,
+                )
+              : parseImagePlan(
+                  raw,
+                  preparedTarget.segments,
+                  promptOptions.minImages,
+                  promptOptions.maxImages,
+                );
           // 单槽重写忽略本次 changes,不校验建档 nl —— 校验它会为一份会被丢弃的
           // changes 白白消耗重试次数。
           if (

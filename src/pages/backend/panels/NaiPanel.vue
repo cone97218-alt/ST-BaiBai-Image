@@ -242,6 +242,7 @@ function duplicateArtist() {
   const preset: NaiArtistPreset = {
     id: newNaiArtist().id,
     name: `${src.name} 副本`,
+    desc: src.desc ?? '',
     prompt: src.prompt,
     quality: src.quality,
     negative: src.negative,

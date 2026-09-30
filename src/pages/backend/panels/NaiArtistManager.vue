@@ -111,6 +111,7 @@ function duplicate(item: ManagerItem) {
   const preset: NaiArtistPreset = {
     id: newNaiArtist().id,
     name: `${src.name} 副本`,
+    desc: src.desc ?? '',
     prompt: src.prompt,
     quality: src.quality,
     negative: src.negative,
@@ -147,13 +148,8 @@ function pickPreview(preset: NaiArtistPreset) {
   previewFileInput.value?.click();
 }
 
-async function onPreviewFileChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = '';
-  const target = previewTarget;
-  previewTarget = null;
-  if (!file || !target) return;
+async function uploadPreviewFile(target: NaiArtistPreset, file: File) {
+  if (uploadingId.value) return;
   uploadingId.value = target.id;
   try {
     const dataUrl = await readFileAsDataUrl(file);
@@ -167,6 +163,24 @@ async function onPreviewFileChange(event: Event) {
     toastr.error(errorMessage(error), '预览图上传失败');
   } finally {
     uploadingId.value = null;
+  }
+}
+
+async function onPreviewFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  const target = previewTarget;
+  previewTarget = null;
+  if (!file || !target) return;
+  await uploadPreviewFile(target, file);
+}
+
+function onDropPreview(preset: NaiArtistPreset, event: DragEvent) {
+  event.preventDefault();
+  const file = event.dataTransfer?.files?.[0];
+  if (file && file.type.startsWith('image/')) {
+    void uploadPreviewFile(preset, file);
   }
 }
 
@@ -235,11 +249,13 @@ async function confirmDelete() {
 
 const editItem = ref<ManagerItem | null>(null);
 const editName = ref('');
+const editDesc = ref('');
 const editPrompt = ref('');
 
 function openEdit(item: ManagerItem) {
   editItem.value = item;
   editName.value = item.preset.name;
+  editDesc.value = item.preset.desc ?? '';
   editPrompt.value = item.preset.prompt;
 }
 
@@ -251,6 +267,7 @@ function saveEdit() {
   const item = editItem.value;
   if (!item || item.builtin) return; // 内置只读(按钮已隐藏,双保险)
   item.preset.name = editName.value.trim();
+  item.preset.desc = editDesc.value.trim();
   item.preset.prompt = editPrompt.value;
   closeEdit();
 }
@@ -323,7 +340,11 @@ function duplicateFromEdit() {
             :title="item.preset.id === activeId ? '当前画师串,点击停用' : '点击设为当前画师串'"
             @click="toggleActive(item)"
           >
-            <div class="am-art">
+            <div
+              class="am-art"
+              @dragover.prevent
+              @drop.stop.prevent="!item.builtin && onDropPreview(item.preset, $event)"
+            >
               <img
                 v-if="item.preset.previewPath"
                 class="am-art-img"
@@ -390,6 +411,9 @@ function duplicateFromEdit() {
                   {{ item.preset.name || '未命名画师串' }}
                 </div>
               </div>
+              <div v-if="item.preset.desc?.trim()" class="am-desc" :title="item.preset.desc">
+                {{ item.preset.desc }}
+              </div>
               <div class="am-prompt" :title="item.preset.prompt">
                 {{ item.preset.prompt || '(空)' }}
               </div>
@@ -397,7 +421,7 @@ function duplicateFromEdit() {
                 <button
                   class="am-op"
                   type="button"
-                  :title="item.builtin ? '查看内容(内置只读)' : '编辑名称与内容'"
+                  :title="item.builtin ? '查看内容(内置只读)' : '编辑名称、备注与封面'"
                   :aria-label="item.builtin ? '查看内容' : '编辑'"
                   @click="openEdit(item)"
                 >
@@ -471,7 +495,11 @@ function duplicateFromEdit() {
         </button>
       </header>
 
-      <div class="am-edit-preview">
+      <div
+        class="am-edit-preview"
+        @dragover.prevent
+        @drop.stop.prevent="!editItem.builtin && onDropPreview(editItem.preset, $event)"
+      >
         <img
           v-if="editItem.preset.previewPath"
           class="am-edit-thumb"
@@ -508,6 +536,18 @@ function duplicateFromEdit() {
           v-model="editName"
           :readonly="editItem.builtin"
           placeholder="画师串名称"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="bbi-modal-field">
+        <span class="bbi-modal-label">备注</span>
+        <input
+          class="bbi-input"
+          type="text"
+          v-model="editDesc"
+          :readonly="editItem.builtin"
+          placeholder="画风特点、适用场景或推荐搭配等备注说明"
           spellcheck="false"
         />
       </div>
@@ -791,6 +831,16 @@ function duplicateFromEdit() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.am-desc {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--bbi-ink-soft);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 /* 内容摘要:等宽两行截断,min-height 撑齐没填内容的卡 */
 .am-prompt {

@@ -523,6 +523,58 @@ describe('buildNaiParameters', () => {
     const p2 = buildNaiParameters(nai({ seed: 123 }), { prompt: 'x', seed: 7 });
     expect(p2.seed).toBe(7);
   });
+
+  it('builds v4_prompt and v4_negative_prompt char_captions from comic panels', () => {
+    const comicData = {
+      format: 'nai5-comic' as const,
+      page: { base: 'comic, 4 panels, monochrome' },
+      panels: [
+        {
+          id: 'P1',
+          characters: [
+            {
+              character_id: 'C1',
+              positive: 'girl, short hair, smile',
+              negative: 'long hair',
+              center: { x: 0.3, y: 0.4 },
+            },
+            {
+              character_id: 'C2',
+              positive: 'boy, tall, waving',
+              negative: 'short',
+            },
+          ],
+        },
+      ],
+    };
+
+    const p = buildNaiParameters(nai({ model: 'nai-diffusion-5-full' }), {
+      prompt: 'comic, 4 panels, monochrome',
+      comic: comicData,
+      seed: 42,
+    });
+
+    const v4Prompt = p.v4_prompt as {
+      caption: {
+        base_caption: string;
+        char_captions: Array<{ char_caption: string; centers: Array<{ x: number; y: number }> }>;
+      };
+    };
+    expect(v4Prompt.caption.char_captions).toHaveLength(2);
+    expect(v4Prompt.caption.char_captions[0].char_caption).toBe('girl, short hair, smile');
+    expect(v4Prompt.caption.char_captions[0].centers).toEqual([{ x: 0.3, y: 0.4 }]);
+    expect(v4Prompt.caption.char_captions[1].char_caption).toBe('boy, tall, waving');
+    expect(v4Prompt.caption.char_captions[1].centers).toEqual([{ x: 0.5, y: 0.5 }]);
+
+    const v4Neg = p.v4_negative_prompt as {
+      caption: {
+        base_caption: string;
+        char_captions: Array<{ char_caption: string; centers: Array<{ x: number; y: number }> }>;
+      };
+    };
+    expect(v4Neg.caption.char_captions[0].char_caption).toBe('long hair');
+    expect(v4Neg.caption.char_captions[1].char_caption).toBe('short');
+  });
 });
 
 describe('skipCfgAboveSigma', () => {

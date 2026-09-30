@@ -19,6 +19,20 @@ describe('matchArtist', () => {
     expect(matchArtist(p, 'AS109')).toBe(true);
     expect(matchArtist(p, '油画')).toBe(false);
   });
+
+  it('按备注内容匹配,大小写不敏感', () => {
+    const p: NaiArtistPreset = {
+      id: 'a',
+      name: '厚涂',
+      desc: '水彩质感赛博朋克风',
+      prompt: 'artist:wlop',
+      quality: '',
+      negative: '',
+    };
+    expect(matchArtist(p, '水彩')).toBe(true);
+    expect(matchArtist(p, '赛博')).toBe(true);
+    expect(matchArtist(p, '像素')).toBe(false);
+  });
 });
 
 describe('planArtistRemoval', () => {

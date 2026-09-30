@@ -1,3 +1,4 @@
+import type { ComicPageData } from '@/autoTag/comicProtocol';
 import type { ImageCharacterPrompt } from '@/autoTag/protocol';
 import { normalizeOrientation, type Orientation } from '@/backends/size';
 import { getContext } from '@/st/context';
@@ -171,7 +172,7 @@ export function stripImageTags(mes: string): string {
  * 内容里混进一个 `</bbi_image>` 就会让 tag 提前截断、后半截漏进 DOM 与提示词，
  * 正好破掉「tag 永不进 DOM、永不进提示词」这条不变式。
  */
-export const FORBIDDEN_SUBTAG = /<\/?(?:bbi_image|tag|nl|negative|characters|size)\b/i;
+export const FORBIDDEN_SUBTAG = /<\/?(?:bbi_image|tag|nl|negative|characters|comic|size)\b/i;
 
 /** 文本里是否含 bbi_image 子标签字面量（手输校验用；口径同 AI 侧）。 */
 export function containsTagMarkup(text: string): boolean {
@@ -186,6 +187,8 @@ export interface ImageTagContent {
   /** 本画面动态负面 tag：<negative> 子标签内容，无则空串。 */
   negative: string;
   characters: ImageCharacterPrompt[];
+  /** 漫画分镜结构数据(仅 NAI 漫画模式产生) */
+  comic?: ComicPageData;
   /** 画幅方向：<size> 子标签内容，无/不可识别则竖屏（存量 tag 即走这条，行为与改动前一致）。 */
   size: Orientation;
 }
@@ -196,7 +199,7 @@ export interface ImageTagContent {
  * - <bbi_image>xxxx<nl>yyyy</nl></bbi_image>       裸文本 = tag，<nl> = nl
  * - <bbi_image><tag>x</tag><negative>y</negative></bbi_image> 显式子标签（手写容忍）
  * 裸文本与显式 <tag> 同时存在时按「裸文本在前」以 ", " 合并进 tag 部分，不丢内容。
- * <size>/<nl>/<negative> 必须先剥掉，不能漏进正向提示词。
+ * <size>/<nl>/<negative>/<comic> 必须先剥掉，不能漏进正向提示词。
  */
 export function parseImageTagContent(raw: string): ImageTagContent {
   // 内容统一折叠成单行:手写 tag 可能跨行,而提示词里换行没有意义
@@ -225,19 +228,32 @@ export function parseImageTagContent(raw: string): ImageTagContent {
       // Invalid character JSON must not break the otherwise valid Base prompt.
     }
   }
+  const comicMatch = inner.match(/<comic>([\s\S]*?)<\/comic>/i);
+  let comic: ComicPageData | undefined = undefined;
+  if (comicMatch) {
+    try {
+      const parsed = JSON.parse(comicMatch[1]) as unknown;
+      if (parsed && typeof parsed === 'object' && (parsed as Record<string, unknown>).format === 'nai5-comic') {
+        comic = parsed as ComicPageData;
+      }
+    } catch {
+      // Invalid comic JSON
+    }
+  }
   const sizeMatch = inner.match(/<size>([\s\S]*?)<\/size>/i);
   const size = normalizeOrientation(sizeMatch ? oneLine(sizeMatch[1]) : '');
   const withoutSubTags = inner
     .replace(/<nl>[\s\S]*?<\/nl>/gi, '')
     .replace(/<negative>[\s\S]*?<\/negative>/gi, '')
     .replace(/<characters>[\s\S]*?<\/characters>/gi, '')
+    .replace(/<comic>[\s\S]*?<\/comic>/gi, '')
     .replace(/<size>[\s\S]*?<\/size>/gi, '');
   const explicit = [...withoutSubTags.matchAll(/<tag>([\s\S]*?)<\/tag>/gi)]
     .map(match => oneLine(match[1]))
     .filter(Boolean);
   const bare = oneLine(withoutSubTags.replace(/<tag>[\s\S]*?<\/tag>/gi, ''));
   const tag = [...(bare ? [bare] : []), ...explicit].join(', ');
-  return { tag, nl, negative, characters, size };
+  return { tag, nl, negative, characters, comic, size };
 }
 
 /**
@@ -256,7 +272,10 @@ export function serializeImageTag(content: ImageTagContent): string {
   const characters = content.characters.length
     ? `<characters>${JSON.stringify(content.characters)}</characters>`
     : '';
-  return `<bbi_image>${content.tag}${nl}${negative}${characters}<size>${content.size}</size></bbi_image>`;
+  const comic = content.comic
+    ? `<comic>${JSON.stringify(content.comic)}</comic>`
+    : '';
+  return `<bbi_image>${content.tag}${nl}${negative}${characters}${comic}<size>${content.size}</size></bbi_image>`;
 }
 
 /**

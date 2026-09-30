@@ -269,6 +269,33 @@ describe('parseImageTagContent', () => {
     expect(parseImageTagContent('<bbi_image>1girl</bbi_image>').size).toBe('portrait');
     expect(parseImageTagContent('<bbi_image>1girl<size>乱写</size></bbi_image>').size).toBe('portrait');
   });
+
+  it('parses and serializes <comic> sub-tag correctly without leaking into Base tag', () => {
+    const comicData = {
+      format: 'nai5-comic' as const,
+      page: { base: 'comic, 4 panels, monochrome' },
+      panels: [
+        {
+          id: 'P1',
+          characters: [{ character_id: 'C1', positive: 'girl, smile' }],
+        },
+      ],
+    };
+    const serialized = serializeImageTag({
+      tag: 'comic, 4 panels, monochrome',
+      nl: '',
+      negative: '',
+      characters: [{ name: 'C1', tag: 'girl, smile', nl: '' }],
+      comic: comicData,
+      size: 'portrait',
+    });
+    expect(serialized).toContain('<comic>');
+    expect(serialized).toContain('nai5-comic');
+
+    const parsed = parseImageTagContent(serialized);
+    expect(parsed.tag).toBe('comic, 4 panels, monochrome');
+    expect(parsed.comic).toEqual(comicData);
+  });
 });
 
 describe('serializeImageTag', () => {

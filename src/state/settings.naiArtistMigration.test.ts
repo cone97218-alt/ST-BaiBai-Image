@@ -51,13 +51,15 @@ describe('NAI 画师串库', () => {
   it('新格式原样保留,当前项不被动(迁移幂等)', async () => {
     const settings = await hydrateWithNai({
       artistPresets: [
-        { id: 'art_a', name: '厚涂', prompt: 'artist:wlop', quality: 'masterpiece', negative: 'lowres' },
+        { id: 'art_a', name: '厚涂', desc: '厚涂说明', prompt: 'artist:wlop', quality: 'masterpiece', negative: 'lowres' },
         { id: 'art_b', name: '赛璐璐', prompt: 'artist:as109', quality: '', negative: '' },
       ],
       activeArtistId: 'art_b',
     });
     expect(settings.nai.artistPresets.map(a => a.id)).toEqual(['art_a', 'art_b']);
     expect(settings.nai.artistPresets.map(a => a.name)).toEqual(['厚涂', '赛璐璐']);
+    expect(settings.nai.artistPresets[0].desc).toBe('厚涂说明');
+    expect(settings.nai.artistPresets[1].desc).toBe('');
     expect(settings.nai.artistPresets[0].quality).toBe('masterpiece');
     expect(settings.nai.artistPresets[0].negative).toBe('lowres');
     expect(settings.nai.activeArtistId).toBe('art_b');

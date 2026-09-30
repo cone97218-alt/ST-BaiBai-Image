@@ -6,17 +6,21 @@ import type { NaiArtistPreset } from '@/state/settings';
  */
 
 /**
- * 搜索匹配:名称 + 画师串内容,大小写不敏感的子串匹配;空词恒真(= 不过滤)。
- * 绑定的正/负面词不参与——用户记画风靠的是名字和那串 artist tag,
+ * 搜索匹配:名称 + 备注 + 画师串内容,大小写不敏感的子串匹配;空词恒真(= 不过滤)。
+ * 绑定的正/负面词不参与——用户记画风靠的是名字、备注和那串 artist tag,
  * 匹配面铺得越广,「明明搜到了」与「这怎么也命中」的意外都越多。
  */
 export function matchArtist(
-  preset: Pick<NaiArtistPreset, 'name' | 'prompt'>,
+  preset: Pick<NaiArtistPreset, 'name' | 'prompt'> & { desc?: string },
   query: string,
 ): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return preset.name.toLowerCase().includes(q) || preset.prompt.toLowerCase().includes(q);
+  return (
+    preset.name.toLowerCase().includes(q) ||
+    Boolean(preset.desc && preset.desc.toLowerCase().includes(q)) ||
+    preset.prompt.toLowerCase().includes(q)
+  );
 }
 
 export interface ArtistRemovalPlan {

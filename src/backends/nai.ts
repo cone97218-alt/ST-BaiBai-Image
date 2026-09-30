@@ -1,6 +1,7 @@
 import { unzipSync } from 'fflate';
 import { randomUuid } from '@/randomUuid';
 
+import type { ComicPageData } from '@/autoTag/comicProtocol';
 import type { ImageCharacterPrompt } from '@/autoTag/protocol';
 import type { ComfyImageResult } from '@/backends/comfyui';
 import {
@@ -236,6 +237,7 @@ export interface NaiGenerateValues {
   prompt: string;
   nl?: string;
   characters?: ImageCharacterPrompt[];
+  comic?: ComicPageData;
   /** 种子;缺省随机。 */
   seed?: number;
   /** 画幅方向;缺省竖屏(与改动前的固定默认一致)。 */
@@ -263,6 +265,7 @@ export const BUILTIN_NAI_ARTISTS: readonly NaiArtistPreset[] = [
   {
     id: 'bi_default',
     name: '默认画师串',
+    desc: '官方推荐通用二次元画风搭配',
     prompt:
       '0.8::nnmbpx::,0.8::artist:yalmyu::,0.1::smilesmile1312,::,  artist:sh_(shinh), 0.4::chen bin::,0.4::dayama::,healthyman,bacheally,',
     quality: '',
@@ -410,12 +413,39 @@ export function buildNaiParameters(nai: NaiSettings, values: NaiGenerateValues):
   } else {
     // NAI4/4.5/V5: v4 caption structure; Vibe uses a model-specific cached encoding.
     params.reference_image_multiple_cached = [];
-    const charCaptions = naiSupportsCharacterPrompts(nai.model)
-      ? (values.characters ?? []).map(character => ({
+    let charCaptions: Array<{ char_caption: string; centers: Array<{ x: number; y: number }> }> = [];
+    let negCharCaptions: Array<{ char_caption: string; centers: Array<{ x: number; y: number }> }> = [];
+
+    if (naiSupportsCharacterPrompts(nai.model)) {
+      if (values.comic?.panels && values.comic.panels.length > 0) {
+        for (const panel of values.comic.panels) {
+          if (!Array.isArray(panel.characters)) continue;
+          for (const c of panel.characters) {
+            const pos = (c.positive || '').trim();
+            if (!pos) continue;
+            const center = c.center ?? { x: 0.5, y: 0.5 };
+            charCaptions.push({
+              char_caption: pos,
+              centers: [center],
+            });
+            negCharCaptions.push({
+              char_caption: (c.negative || '').trim(),
+              centers: [center],
+            });
+          }
+        }
+      } else if (values.characters && values.characters.length > 0) {
+        charCaptions = values.characters.map(character => ({
           char_caption: characterCaption(character),
           centers: [{ x: 0.5, y: 0.5 }],
-        }))
-      : [];
+        }));
+        negCharCaptions = charCaptions.map(() => ({
+          char_caption: '',
+          centers: [{ x: 0.5, y: 0.5 }],
+        }));
+      }
+    }
+
     params.characterPrompts = [];
     params.v4_prompt = {
       caption: { base_caption: prompt, char_captions: charCaptions },
@@ -425,7 +455,7 @@ export function buildNaiParameters(nai: NaiSettings, values: NaiGenerateValues):
     params.v4_negative_prompt = {
       caption: {
         base_caption: negative,
-        char_captions: charCaptions.map(() => ({ char_caption: '', centers: [{ x: 0.5, y: 0.5 }] })),
+        char_captions: negCharCaptions,
       },
       legacy_uc: false,
     };

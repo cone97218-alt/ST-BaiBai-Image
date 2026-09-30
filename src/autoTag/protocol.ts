@@ -1,3 +1,4 @@
+import type { ComicPageData } from '@/autoTag/comicProtocol';
 import { normalizeOrientation, type Orientation } from '@/backends/size';
 import type { TargetSegment } from '@/autoTag/clean';
 import { FORBIDDEN_SUBTAG, serializeImageTag } from '@/st/imageTagRegex';
@@ -25,6 +26,8 @@ export interface ImageInsertion {
   /** 本画面动态负面 tag(可空;仅在 ComfyUI 工作流使用 %negative_prompt% 时要求模型输出)。 */
   negative: string;
   characters: ImageCharacterPrompt[];
+  /** 漫画分镜结构数据(仅 NAI 漫画模式产生) */
+  comic?: ComicPageData;
   /** 画幅方向:模型只判横/竖,具体像素由用户在后端面板配置。漏给/乱给一律降级竖屏。 */
   size: Orientation;
 }
