@@ -87,13 +87,31 @@ function extractComicJsonCandidates(raw: string): ComicPageData[] {
   return candidates;
 }
 
+function safeString(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) {
+    return value
+      .map(v => (typeof v === 'string' ? v.trim() : typeof v === 'object' && v ? JSON.stringify(v) : String(v ?? '')))
+      .filter(Boolean)
+      .join(', ');
+  }
+  if (value && typeof value === 'object') {
+    return Object.values(value)
+      .map(v => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean)
+      .join(', ');
+  }
+  return '';
+}
+
 function isComicPageData(val: unknown): val is ComicPageData {
   if (!val || typeof val !== 'object' || Array.isArray(val)) return false;
   const o = val as Record<string, unknown>;
   if (o.format !== 'nai5-comic') return false;
   if (!o.page || typeof o.page !== 'object') return false;
   const page = o.page as Record<string, unknown>;
-  if (typeof page.base !== 'string' || !page.base.trim()) return false;
+  const base = safeString(page.base);
+  if (!base) return false;
   return Array.isArray(o.panels);
 }
 
@@ -102,15 +120,20 @@ function isComicPageData(val: unknown): val is ComicPageData {
  * 若模型指定了有效 P 编号则优先遵从；未指定时均匀分布于可选段落，最后一页保证落于末段。
  */
 function resolvePagePosition(
-  pagePosition: string | undefined,
+  pagePosition: unknown,
   pageIndex: number,
   totalPages: number,
   segments: TargetSegment[],
 ): { position: string; sourceLine: number } {
   const fallback = segments[segments.length - 1] ?? { id: 'P1', sourceLine: 0 };
-  if (pagePosition) {
-    const upper = pagePosition.trim().toUpperCase();
-    const matched = segments.find(s => s.id === upper);
+  let posStr = '';
+  if (typeof pagePosition === 'string') {
+    posStr = pagePosition.trim().toUpperCase();
+  } else if (typeof pagePosition === 'number' && Number.isFinite(pagePosition)) {
+    posStr = `P${pagePosition}`;
+  }
+  if (posStr) {
+    const matched = segments.find(s => s.id === posStr);
     if (matched) return { position: matched.id, sourceLine: matched.sourceLine };
   }
 
@@ -132,12 +155,13 @@ function resolvePagePosition(
  */
 function extractCharactersFromPanels(panels: ComicPanel[]): ImageCharacterPrompt[] {
   const characters: ImageCharacterPrompt[] = [];
+  if (!Array.isArray(panels)) return characters;
   for (const panel of panels) {
-    if (!Array.isArray(panel.characters)) continue;
+    if (!panel || !Array.isArray(panel.characters)) continue;
     for (const c of panel.characters) {
       if (!c || typeof c !== 'object') continue;
-      const name = (c.character_id || 'Character').trim();
-      const tag = (c.positive || '').trim();
+      const name = safeString(c.character_id) || 'Character';
+      const tag = safeString(c.positive);
       if (tag) {
         characters.push({
           name,
@@ -188,8 +212,8 @@ export function parseComicPlan(
       segments,
     );
 
-    const baseTag = pageData.page.base.trim().replace(/[\r\n]+/g, ' ');
-    const nonChar = (pageData.page.non_character || '').trim().replace(/[\r\n]+/g, ' ');
+    const baseTag = safeString(pageData.page.base).replace(/[\r\n]+/g, ' ');
+    const nonChar = safeString(pageData.page.non_character).replace(/[\r\n]+/g, ' ');
     const characters = extractCharactersFromPanels(pageData.panels);
 
     images.push({

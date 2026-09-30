@@ -145,4 +145,29 @@ describe('comicProtocol - parseComicPlan', () => {
     const plan = parseComicPlan(raw, mockSegments, 1, 2);
     expect(plan.images).toHaveLength(2);
   });
+
+  it('handles non-string non_character and numeric position gracefully without throwing', () => {
+    const raw = `<image>
+{
+  "format": "nai5-comic",
+  "page": {
+    "base": "comic, 4 panels",
+    "non_character": ["Text: 第一句", "Text: 第二句"],
+    "position": 2
+  },
+  "panels": [
+    {
+      "id": "P1",
+      "characters": [
+        { "character_id": "C1", "positive": "1girl" }
+      ]
+    }
+  ]
+}
+</image>`;
+    const plan = parseComicPlan(raw, mockSegments, 1, 2);
+    expect(plan.images).toHaveLength(1);
+    expect(plan.images[0].nl).toBe('Text: 第一句, Text: 第二句');
+    expect(plan.images[0].position).toBe('P2');
+  });
 });
