@@ -170,4 +170,31 @@ describe('comicProtocol - parseComicPlan', () => {
     expect(plan.images[0].nl).toBe('Text: 第一句, Text: 第二句');
     expect(plan.images[0].position).toBe('P2');
   });
+
+  it('parses changes inside comic output', () => {
+    const raw = `<image>
+{
+  "format": "nai5-comic",
+  "changes": [
+    {
+      "name": "小雪",
+      "field": "new",
+      "fields": { "sex": "1girl", "hair": "long silver hair", "eyes": "red eyes" },
+      "position": "P1",
+      "reason": "新角色出场"
+    }
+  ],
+  "page": {
+    "base": "comic, 1 page"
+  },
+  "panels": []
+}
+</image>`;
+    const plan = parseComicPlan(raw, mockSegments, 1, 2);
+    expect(plan.images).toHaveLength(1);
+    expect(plan.changes).toHaveLength(1);
+    expect(plan.changes[0].name).toBe('小雪');
+    expect(plan.changes[0].field).toBe('new');
+    expect(plan.changes[0].position).toBe('P1');
+  });
 });

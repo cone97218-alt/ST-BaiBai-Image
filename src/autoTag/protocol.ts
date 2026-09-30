@@ -257,7 +257,7 @@ function parseNewFields(raw: Record<string, unknown>): string | null {
   return JSON.stringify(fields);
 }
 
-function parseChanges(raw: unknown, positions: Map<string, number>): CharChange[] {
+export function parseChanges(raw: unknown, positions: Map<string, number>): CharChange[] {
   if (!Array.isArray(raw)) return [];
   const out: CharChange[] = [];
   for (const item of raw) {

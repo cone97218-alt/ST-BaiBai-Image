@@ -1,5 +1,5 @@
 import type { TargetSegment } from '@/autoTag/clean';
-import type { ImageCharacterPrompt, ImageInsertion, ImagePlan } from '@/autoTag/protocol';
+import { parseChanges, type ImageCharacterPrompt, type ImageInsertion, type ImagePlan } from '@/autoTag/protocol';
 import { normalizeOrientation, type Orientation } from '@/backends/size';
 
 export interface ComicPageBase {
@@ -228,8 +228,29 @@ export function parseComicPlan(
     });
   }
 
+  const positions = new Map(segments.map(segment => [segment.id, segment.sourceLine]));
+  let changes: ReturnType<typeof parseChanges> = [];
+  for (const pageData of candidates) {
+    if (Array.isArray((pageData as unknown as { changes?: unknown }).changes)) {
+      changes = changes.concat(
+        parseChanges((pageData as unknown as { changes: unknown }).changes, positions),
+      );
+    }
+  }
+  if (changes.length === 0) {
+    try {
+      const match = raw.match(/"changes"\s*:\s*(\[[^\]]*\])/);
+      if (match) {
+        const parsed = JSON.parse(match[1]) as unknown;
+        changes = parseChanges(parsed, positions);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return {
     images,
-    changes: [],
+    changes,
   };
 }

@@ -306,15 +306,26 @@ export const BUILTIN_NAI_COMIC_PRESET: PromptPreset = {
           label: 'SFW 适龄日常',
           content: `[RATING-DECISION: SFW]
 SFW 适龄日常模式：
-- 普通日常叙事、对话交锋、战斗冒险、伤痕战损、轻度着装暴露或泳装（无主要性器官裸露）。`,
+- 普通日常叙事、对话交锋、战斗冒险、伤痕战损、轻度着装暴露或泳装（无主要性器官裸露）。
+- 聚焦人物表情、肢体动势与场景构图。`,
         },
         {
           id: 'nsfw',
           label: 'NSFW 成人全开',
           content: `[RATING-DECISION: NSFW]
-NSFW 成人全开模式：
-- 画面包含成人情欲内容时，器官零件、衣物边界、接触路径与姿态必须落到准确视觉标签。
-- 明确褪衣边界，禁止隔衣穿模；写清具体动作接触点与体态重力关系。`,
+NSFW 成人全开模式（严格遵循 6 点精准标定准则）：
+1. 角色神态与表情：
+   - 情欲反应必须落到明确视觉标签：blush, embarrassed, open mouth, heavy breathing, half-closed eyes, tears, ahegao, saliva, drooling 等，禁止空泛中性表情。
+2. 标准体位与姿势：
+   - 必须使用标准 Danbooru/日漫体位标签（如 missionary, cowgirl position, doggystyle, mating press, suspended congress, piledriver, standing sex 等），严禁自造模糊动作短语。
+3. 体液交互：
+   - 写明可见附着面与状态（如 sweat, vaginal fluids on thighs, semen on abdomen, bodily fluids, dripping 等）。
+4. 衣物脱卸边界（严防隔衣穿模与凭空全裸）：
+   - 每件离开原位的衣物必须写清还穿在谁身上、褪到身体哪一截、挡住什么（如 skirt pulled up to waist, panties pulled aside exposing pussy, shirt unbuttoned to collarbone 等）。正文明确隔衣时才写 through clothes。
+5. 可见器官零件（严防只写裸体）：
+   - 画面可见对应部位时必须写出具体零件标签（breasts, nipples, areolae, penis, erect penis, pussy, clitoris, labia, testicles, anus）。被衣物、头发或手遮挡时写遮挡物，不凭空发明。本格核心焦点可微权（如 1.15::nipples::）。
+6. 骨盆挂载与人体工学（防悬浮、穿模与吞人）：
+   - 外露器官根部必须明确长在骨盆/胯部；抚摸、插入写明相对空间与接触路径；写清高低差与身体承托（谁坐/躺/站/跪）；施动者手部必须有着力点；特写镜头必须保留一条锚定肢体或承托面，防人物被背景吞掉。`,
         },
       ],
     },
@@ -335,7 +346,7 @@ NSFW 成人全开模式：
 正统日漫 コマ割り (Komawari) 少年热血分镜文法：
 - 核心动势格显著扩大（大通栏或斜切大格占用半页以上空间）；
 - 相邻画格强对撞，采用大角度斜切边框；视线激烈跳跃，动作与冲击力优先；
-- 绘图词使用：大きな主コマ, 斜めに切った枠, 激しい動き, 半ページ以上の大コマ。`,
+- 绘图词使用：大きな主コマ, 斜めに切った枠, 激しい動き, 半ページ以上の大コマ, スピード線, dynamic action, dutch angle。`,
         },
         {
           id: 'seinen',
@@ -344,7 +355,7 @@ NSFW 成人全开模式：
 正统日漫 青年悬疑/写实分镜文法：
 - 采用宽画幅横向长视线格；节奏凝重克制，多层级微表情与眼神阴影特写；
 - 强调细节物证与视线错落，制造戏剧性停顿与压迫感；
-- 绘图词使用：横長のコマ, 接写, 目の影, 重い間。`,
+- 绘图词使用：横長のコマ, 接写, 目の影, 重い間, cinematic lighting, dramatic shadows。`,
         },
         {
           id: 'shoujo',
@@ -352,8 +363,9 @@ NSFW 成人全开模式：
           content: `[PANEL-PACING: DECORATIVE-SHOUJO]
 装饰系少女漫分镜文法：
 - 画格边框可带花卉、羽毛、星屑或柔化纹样；
-- 格间点缀散花与光点粒子，人物可溢出画格与装饰交织；
-- 竖向全身与情感特写多用，强调服饰发丝流动与优雅感。`,
+- 格间点缀散花与光点粒子，人物可溢出画格与装饰交织（コマからはみ出す人物）；
+- 竖向全身与情感特写多用，强调服饰发丝流动与优雅感；
+- 绘图词使用：装飾フレーム, 花・羽・星屑, 柔らかな光, soft focus, sparkling background。`,
         },
         {
           id: 'eromanga',
@@ -361,15 +373,16 @@ NSFW 成人全开模式：
           content: `[PANEL-PACING: EROMANGA-DOUJINSHI]
 成人同人志分镜与构图文法：
 - 主客体互动大画格：每页必设一处核心主画格，完整呈现互动全貌与肢体纠缠；
-- 嵌入式局部切入小格（Insert Cut-in）：在大格边角紧贴极近特写小格，收束视觉焦点至敏感接触部位或失神神态；
-- 身体曲线贴合格（Body Contour Framing）：边框顺应卧躺、仰面或交缠线条作动态贴合。`,
+- 嵌入式局部切入小格（Insert Cut-in / 挿入コマ）：在大格边角紧贴极近特写小格，收束视觉焦点至敏感接触部位或失神神态；
+- 身体曲线贴合格（Body Contour Framing）：边框顺应卧躺、仰面或交缠线条作动态贴合；
+- 绘图词使用：大きな主コマ, 挿入コマ, 接写, 肉感的な構図, close-up on contact, expressive eyes。`,
         },
         {
           id: 'yonkoma',
           label: '经典四格',
           content: `[PANEL-PACING: 4-KOMA]
 经典四格漫画规范分镜：
-- 严格起承转结节奏，垂直四格阶梯布局，等宽矩形框；
+- 严格起承转结（起・承・転・結）节奏，垂直四格阶梯布局，等宽矩形框；
 - 边界清晰稳定，节奏工整。`,
         },
       ],
@@ -424,10 +437,19 @@ NSFW 成人全开模式：
           id: 'adaptive',
           label: '自适应日漫气泡',
           content: `[BUBBLE: ADAPTIVE]
-日漫气泡契约：
-- 普通对白：通常吹き出し，Layout: 縦書き，尖尾指向发言人口元；
-- 叫喊：ギザギザ吹き出し；心声：思考の吹き出し；旁白：横書き ナレーション枠；
-- 台词原文放在末尾 Text:，Text: 内部保留原句。`,
+日漫气泡与文字演出契约：
+1. 标点与类型转译：
+   - 「……」➔ BubbleType: 通常吹き出し, Layout: 縦書き, Text: ……
+   - 「……！！」➔ BubbleType: 叫び吹き出し / ギザギザ吹き出し, Layout: 縦書き, Text: ……！！
+   - *……* 或 （……） ➔ BubbleType: 思考の吹き出し, Layout: 縦書き, Text: ……
+   - 【……】➔ SFX: 擬音, 吹き出しなし, Text: ……
+   - {……} ➔ BubbleType: ナレーション枠, Layout: 横書き, Text: ……（仅限客观叙述或时空提示）
+2. 排版与方向：
+   - 角色对白与心声采用日漫縦書き（列序右→左），外语对白、道具字与旁白采用横書き；
+   - 尖尾指向发言人口元，先读右上，后读左下。
+3. 原句保留与拆分：
+   - 台词原文放在末尾 Text:，禁止外包引号括号，严禁在 Text: 后追加视觉标签；
+   - 长对白按呼吸停顿拆成连环气泡；同格同一人物多句在 positive 说明气泡位置，单个 Text: 内用空行分隔多句。`,
         },
         {
           id: 'none',
