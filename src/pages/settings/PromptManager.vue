@@ -277,6 +277,14 @@ function insertMacro(entry: PromptEntry, token: string) {
   entry.content = (entry.content ?? '') + token;
 }
 
+// 获取变体条目当前选中项的名称
+function getActiveVariantLabel(entry: PromptEntry): string {
+  if (entry.kind !== 'variant' || !entry.variants?.length) return '';
+  const selected =
+    entry.variants.find(v => v.id === entry.activeVariantId) ?? entry.variants[0];
+  return selected?.label ?? '';
+}
+
 // 变体管理（新增 / 改名 / 删除）
 const addingVariantForId = ref<string | null>(null);
 const newVariantLabel = ref('');
@@ -487,6 +495,14 @@ const MARKER_DESCRIPTIONS: Record<PromptMarkerKey, string> = {
                   </template>
                   <template v-else>
                     <span class="bbi-pm-entry-name" :title="entry.name">{{ entry.name }}</span>
+                    <!-- 折叠状态下在标题栏以小字注明当前选中变体 -->
+                    <span
+                      v-if="entry.kind === 'variant' && !expandedEntries.has(entry.id) && getActiveVariantLabel(entry)"
+                      class="bbi-pm-variant-cur-note"
+                      :title="`当前选中变体：${getActiveVariantLabel(entry)}`"
+                    >
+                      {{ getActiveVariantLabel(entry) }}
+                    </span>
                     <button
                       v-if="!entry.builtin"
                       class="bbi-pm-btn-icon bbi-pm-btn-edit"
@@ -895,6 +911,22 @@ const MARKER_DESCRIPTIONS: Record<PromptMarkerKey, string> = {
   text-overflow: ellipsis;
 }
 
+.bbi-pm-variant-cur-note {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--bbi-primary, #818cf8);
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  padding: 1px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
 .bbi-pm-entry-badges {
   display: flex;
   align-items: center;
@@ -1175,6 +1207,12 @@ const MARKER_DESCRIPTIONS: Record<PromptMarkerKey, string> = {
     font-size: 9px;
     padding: 0 4px;
     line-height: 1.4;
+  }
+
+  .bbi-pm-variant-cur-note {
+    font-size: 10px;
+    padding: 1px 5px;
+    max-width: 100px;
   }
 
   .bbi-pm-entry-right-actions {
