@@ -171,6 +171,50 @@
   color: var(--bbi-accent);
 }
 
+/* ——— 流式预览态:悬浮小胶囊与底部进度条 ——— */
+
+.bbi-figure__busy[data-streaming='1'] {
+  background: transparent;
+  backdrop-filter: none;
+  justify-content: flex-end;
+  padding: 14px;
+}
+
+.bbi-figure__stream-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: var(--bbi-radius-pill);
+  background: color-mix(in srgb, var(--bbi-surface) 85%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--bbi-line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  z-index: 2;
+}
+
+.bbi-figure__spin--sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+.bbi-figure__stream-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 3;
+}
+
+.bbi-figure__stream-progress-bar {
+  height: 100%;
+  background: var(--bbi-accent);
+  transition: width 0.15s ease-out;
+}
+
 /* ——— 无图且空闲:占位区中央的生成入口 / 配置引导 ——— */
 
 .bbi-figure__pending {

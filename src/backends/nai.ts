@@ -10,6 +10,7 @@ import {
   type NaiRetryInfo,
 } from '@/backends/naiRateLimit';
 import { parseSize, pickSize, type Orientation } from '@/backends/size';
+import { generateNaiStreamImage } from '@/backends/naiStream';
 import { clampVibeStrength, loadVibeData } from '@/backends/vibeStore';
 import type { GenerationArtist, GenerationMeta, GenerationParams, GenerationVibe } from '@/generationMeta';
 import type {
@@ -658,7 +659,10 @@ export async function generateNaiImage(
   nai: NaiSettings,
   values: NaiGenerateValues,
   signal?: AbortSignal,
-  opts: { onRetry?: (info: NaiRetryInfo) => void } = {},
+  opts: {
+    onRetry?: (info: NaiRetryInfo) => void;
+    onStreamPreview?: (preview: { url: string; step: number; total: number }) => void;
+  } = {},
 ): Promise<NaiImageOutput> {
   if (!nai.key.trim()) throw new NaiError('请先填写 NAI API Key');
   if (!values.prompt.trim()) throw new NaiError('正向提示词不能为空');
@@ -699,32 +703,59 @@ export async function generateNaiImage(
     parameters: params,
     use_new_shared_trial: true,
   };
+
+  // 流式中间帧去噪预览：开启时优先尝试流式端点，如遇第三方代理不支持则平滑回退普通端点
+  let streamResult: ComfyImageResult | null = null;
+  if (nai.streamPreview) {
+    try {
+      const streamOutput = await generateNaiStreamImage(
+        nai,
+        body,
+        signal,
+        opts.onStreamPreview,
+      );
+      if (streamOutput) {
+        streamResult = {
+          url: streamOutput.url,
+          filename: streamOutput.filename,
+          format: streamOutput.format,
+          revoke() {},
+        };
+      }
+    } catch (streamErr) {
+      if (signal?.aborted) throw streamErr;
+      console.warn('[柏宝绘] NAI 流式端点不可用或失败，自动回退普通生图模式:', streamErr);
+    }
+  }
+
   // 只把「发请求 + 解包」包进重试:上面拼参数、读 vibe 数据的活是一次性的,
   // 重跑它们既白费功夫,也会把 vibe 缺编码的 toastr 警告重复弹出来。
-  const result = await runNaiWithRetry(
-    async () => {
-      const resp = await fetch(naiEndpoint(nai.url, 'generate-image'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${nai.key.trim()}`,
-        },
-        body: JSON.stringify(body),
-        signal,
-      });
-      if (!resp.ok) throw await naiHttpError(resp, 'NAI 生图失败');
+  const result =
+    streamResult ??
+    (await runNaiWithRetry(
+      async () => {
+        const resp = await fetch(naiEndpoint(nai.url, 'generate-image'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${nai.key.trim()}`,
+          },
+          body: JSON.stringify(body),
+          signal,
+        });
+        if (!resp.ok) throw await naiHttpError(resp, 'NAI 生图失败');
 
-      const { base64, filename } = unzipNaiImage(await resp.arrayBuffer());
-      const format = filename.split('.').pop()?.toLowerCase() || 'png';
-      return {
-        url: `data:image/${format === 'jpg' ? 'jpeg' : format};base64,${base64}`,
-        filename: `nai-${Date.now()}.${format}`,
-        format,
-        revoke() {},
-      };
-    },
-    { signal, onRetry: opts.onRetry },
-  );
+        const { base64, filename } = unzipNaiImage(await resp.arrayBuffer());
+        const format = filename.split('.').pop()?.toLowerCase() || 'png';
+        return {
+          url: `data:image/${format === 'jpg' ? 'jpeg' : format};base64,${base64}`,
+          filename: `nai-${Date.now()}.${format}`,
+          format,
+          revoke() {},
+        };
+      },
+      { signal, onRetry: opts.onRetry },
+    ));
 
   return {
     result,

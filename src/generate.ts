@@ -61,6 +61,8 @@ export interface GenerateProgress {
   onQueue?: (ahead: number | null) => void;
   /** NAI 限流退避进度;传 null 表示已不在退避中。 */
   onRetry?: (retry: { attempt: number; max: number } | null) => void;
+  /** NAI 流式去噪预览回调 (中间帧图与当前步数)。 */
+  onStreamPreview?: (preview: { url: string; step: number; total: number }) => void;
 }
 
 export interface GenerateOutput {
@@ -213,7 +215,10 @@ export async function generateImage(
           size,
         },
         signal,
-        { onRetry: info => progress.onRetry?.({ attempt: info.attempt, max: info.max }) },
+        {
+          onRetry: info => progress.onRetry?.({ attempt: info.attempt, max: info.max }),
+          onStreamPreview: progress.onStreamPreview,
+        },
       );
       result = output.result;
       meta = { backend: 'nai', model: status.model, ...output.usage };

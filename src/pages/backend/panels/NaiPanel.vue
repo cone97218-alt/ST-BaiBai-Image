@@ -1120,6 +1120,14 @@ async function removeVibe(vibe: NaiVibe) {
           多角色提示照常按角色拆分,只是每个角色同样只写 tag。
         </p>
 
+        <label class="bbi-switch-row">
+          <span class="bbi-field-label">流式中间帧去噪预览</span>
+          <input v-model="settings.nai.streamPreview" type="checkbox" class="bbi-checkbox" />
+        </label>
+        <p class="bbi-field-hint">
+          开：生图过程中实时展示去噪中间画面与步数进度，像看画画直播一样实时反馈；关：保持普通加载遮罩。若使用的反代或第三方服务不支持流式端点，会自动平滑回退普通生成。
+        </p>
+
         <div class="be-row">
           <div class="bbi-field">
             <div class="bbi-field-head">

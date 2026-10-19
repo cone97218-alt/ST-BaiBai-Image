@@ -20,6 +20,7 @@ import {
   reconcileGen,
   setGenPhase,
   setGenRetry,
+  setGenStreamPreview,
   setQueueAhead,
   slotKey,
 } from '@/floor/genState';
@@ -147,6 +148,15 @@ const error = computed(() => record.value?.error ?? '');
 const queueAhead = computed(() => record.value?.queueAhead ?? null);
 /** 限流退避中(NAI 自动重试);非 null 时状态文案优先报它。 */
 const retryInfo = computed(() => record.value?.retry ?? null);
+/** NAI 流式去噪预览图 URL 与进度。 */
+const streamPreviewUrl = computed(() => record.value?.streamPreviewUrl ?? null);
+const streamProgress = computed(() => record.value?.streamProgress ?? null);
+const streamStatusText = computed(() => {
+  if (!streamProgress.value) return '去噪中…';
+  const { step, total } = streamProgress.value;
+  const pct = Math.min(100, Math.round((step / total) * 100));
+  return `去噪中 ${step}/${total} (${pct}%)`;
+});
 
 const comfyActive = computed(() => settings.defaultBackend === 'comfyui');
 const naiActive = computed(() => settings.defaultBackend === 'nai');
@@ -304,6 +314,8 @@ async function generate(): Promise<void> {
       onStart: () => setGenPhase(slot, token, 'generating'),
       onQueue: ahead => setQueueAhead(slot, token, ahead),
       onRetry: retry => setGenRetry(slot, token, retry),
+      onStreamPreview: preview =>
+        setGenStreamPreview(slot, token, preview.url, { step: preview.step, total: preview.total }),
     });
     // 图已经拿到手:此时若发现本任务已被取代(取消后重绘 / reconcile),不要落盘,
     // 否则会把旧提示词的结果写进 extra,并触发一次多余的重水合打断新任务。
@@ -492,9 +504,16 @@ onMounted(() => {
          高度归零 + 淡出,<img> 不卸载——展开瞬间图就在,不会重新发起请求。 -->
     <div class="bbi-figure__collapse" :data-collapsed="collapsed ? '1' : ''">
       <div class="bbi-figure__collapse-inner">
-    <div class="bbi-figure__stage" :data-size="effectiveSize" :data-placeholder="imageSrc ? '' : '1'">
+    <div class="bbi-figure__stage" :data-size="effectiveSize" :data-placeholder="imageSrc || streamPreviewUrl ? '' : '1'">
+      <!-- 流式去噪预览图：生成过程中实时呈现中间画面 -->
       <img
-        v-if="imageSrc"
+        v-if="busy && streamPreviewUrl"
+        class="bbi-figure__img bbi-figure__img--streaming"
+        :src="streamPreviewUrl"
+        alt="去噪预览"
+      />
+      <img
+        v-else-if="imageSrc"
         class="bbi-figure__img"
         :src="imageSrc"
         alt="生图结果"
@@ -502,15 +521,28 @@ onMounted(() => {
         @error="onImageError"
       />
 
-      <!-- 无图时的生成中:骨架微光扫过占位底 -->
-      <div v-if="busy && !imageSrc" class="bbi-figure__skeleton" />
+      <!-- 无图时的生成中:骨架微光扫过占位底(有流式预览时不显示骨架) -->
+      <div v-if="busy && !imageSrc && !streamPreviewUrl" class="bbi-figure__skeleton" />
 
-      <!-- 生成中遮罩:绝对定位盖在整个舞台上(有图=磨砂盖住旧图,无图=压住骨架)。
-           居中 spinner + 状态 + 取消,不再像旧版那样作为 flex 子项跟图片并排互挤。 -->
-      <div v-if="busy" class="bbi-figure__busy">
-        <span class="bbi-figure__spin" />
-        <span class="bbi-figure__busy-text">{{ statusLabel }}</span>
-        <button class="bbi-figure__cancel" type="button" @click="cancel">取消</button>
+      <!-- 生成中遮罩:绝对定位盖在整个舞台上(有图=磨砂盖住旧图,无图=压住骨架;流式时仅显示底部微胶囊)。 -->
+      <div v-if="busy" class="bbi-figure__busy" :data-streaming="streamPreviewUrl ? '1' : ''">
+        <div v-if="streamPreviewUrl" class="bbi-figure__stream-pill">
+          <span class="bbi-figure__spin bbi-figure__spin--sm" />
+          <span class="bbi-figure__busy-text">{{ streamStatusText }}</span>
+          <button class="bbi-figure__cancel" type="button" @click="cancel">取消</button>
+        </div>
+        <template v-else>
+          <span class="bbi-figure__spin" />
+          <span class="bbi-figure__busy-text">{{ statusLabel }}</span>
+          <button class="bbi-figure__cancel" type="button" @click="cancel">取消</button>
+        </template>
+        <!-- 流式去噪底部细进度条 -->
+        <div v-if="streamProgress" class="bbi-figure__stream-progress">
+          <div
+            class="bbi-figure__stream-progress-bar"
+            :style="{ width: `${Math.min(100, Math.round((streamProgress.step / streamProgress.total) * 100))}%` }"
+          />
+        </div>
       </div>
 
       <!-- 提示词重写遮罩(AI 重写提示词):还是同一张图,只盖一层进度与取消;

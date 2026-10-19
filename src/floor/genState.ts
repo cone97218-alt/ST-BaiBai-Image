@@ -44,6 +44,10 @@ export interface GenRecord {
    * 「取消」按钮变回「重绘」,用户还能在 B 之上再开一个任务。
    */
   token: number;
+  /** 流式中间帧实时预览图 URL(由 URL.createObjectURL 生成的 blob URL 或 data URL)。 */
+  streamPreviewUrl?: string | null;
+  /** 去噪步数进度。 */
+  streamProgress?: { step: number; total: number } | null;
 }
 
 export function slotKey(chatId: string, messageId: number, swipeId: number, seq: number): string {
@@ -118,10 +122,32 @@ export function setGenRetry(
   if (record) record.retry = retry;
 }
 
+/** 更新流式中间帧去噪预览。 */
+export function setGenStreamPreview(
+  key: string,
+  token: number,
+  previewUrl: string | null,
+  progress: { step: number; total: number } | null,
+): void {
+  const record = owned(key, token);
+  if (!record) return;
+  if (record.streamPreviewUrl && record.streamPreviewUrl !== previewUrl) {
+    if (record.streamPreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(record.streamPreviewUrl);
+    }
+  }
+  record.streamPreviewUrl = previewUrl;
+  record.streamProgress = progress;
+}
+
 /** 生成成功/放弃:清运行态,卡片回落到派生态(ready/stale/pending)。 */
 export function clearGen(key: string, token?: number): void {
   // 不带 token 表示无条件清(取消/全量重建);带 token 时只有本任务仍在位才清
   if (token !== undefined && !owned(key, token)) return;
+  const rec = records.get(key);
+  if (rec?.streamPreviewUrl?.startsWith('blob:')) {
+    URL.revokeObjectURL(rec.streamPreviewUrl);
+  }
   controllers.delete(key);
   records.delete(key);
 }
@@ -130,6 +156,11 @@ export function clearGen(key: string, token?: number): void {
 export function failGen(key: string, token: number, message: string): void {
   const record = owned(key, token);
   if (!record) return;
+  if (record.streamPreviewUrl?.startsWith('blob:')) {
+    URL.revokeObjectURL(record.streamPreviewUrl);
+  }
+  record.streamPreviewUrl = null;
+  record.streamProgress = null;
   controllers.delete(key);
   record.phase = 'error';
   record.error = message;
@@ -159,6 +190,11 @@ export function reconcileGen(key: string, hash: string): boolean {
 /** 中止并清空全部(切聊天 / 删楼后的全量重建)。 */
 export function clearAllGen(): void {
   for (const controller of controllers.values()) controller.abort();
+  for (const record of records.values()) {
+    if (record.streamPreviewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(record.streamPreviewUrl);
+    }
+  }
   controllers.clear();
   records.clear();
 }

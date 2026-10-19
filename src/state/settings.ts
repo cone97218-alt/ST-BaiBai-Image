@@ -312,6 +312,8 @@ export interface NaiSettings extends BackendConn {
   naturalLanguage: boolean;
   /** 画幅锁(渠道级,面板上与横竖尺寸并排);语义见 size.ts 的 OrientationLock。 */
   orientationLock: OrientationLock;
+  /** 流式生图预览:开 = 生图过程中实时展示去噪过程画面与步数进度;关 = 传统 loading 动画。 */
+  streamPreview?: boolean;
 }
 
 /** 界面偏好里要跨设备同步的部分;activePage 等纯本机临时态不在此。 */
@@ -676,6 +678,7 @@ function naiDefaults(): NaiSettings {
     activeArtistId: BUILTIN_NAI_ARTISTS[0]?.id ?? '',
     naturalLanguage: true,
     orientationLock: 'auto',
+    streamPreview: true,
   };
 }
 
@@ -1198,6 +1201,7 @@ function normalizeNai(raw: unknown, def: NaiSettings): NaiSettings {
     // 老配置缺这两个字段:回落默认 = 开着自然语言、不锁方向,即改动前的行为
     naturalLanguage: typeof o.naturalLanguage === 'boolean' ? o.naturalLanguage : def.naturalLanguage,
     orientationLock: normalizeOrientationLock(o.orientationLock),
+    streamPreview: typeof o.streamPreview === 'boolean' ? o.streamPreview : def.streamPreview,
   };
 }
 
