@@ -9,11 +9,13 @@ import PromptManager from './PromptManager.vue';
 import {
   activePromptPreset,
   BACKENDS,
+  IMAGE_DISPLAY_SIZES,
   newChannel,
   sanitizeTagName,
   settings,
   type ApiChannel,
   type BackendId,
+  type ImageDisplaySize,
 } from '@/state/settings';
 import { getContext } from '@/st/context';
 import {
@@ -71,6 +73,22 @@ const backendSel = computed<string>({
   get: () => settings.defaultBackend,
   set: v => (settings.defaultBackend = v as BackendId),
 });
+const imageDisplaySel = computed<string>({
+  get: () => settings.ui.imageDisplaySize,
+  set: v => (settings.ui.imageDisplaySize = v as ImageDisplaySize),
+});
+const IMAGE_DISPLAY_OPTIONS = IMAGE_DISPLAY_SIZES.map(o => ({ value: o.value, label: o.label }));
+
+// 副 API「生成 tag 使用」:空串 = 跟随主 API,其余为渠道 id。
+// 渠道增删改名要实时反映到选项里,故用 computed 而非静态常量。
+const tagGenSel = computed<string>({
+  get: () => settings.assignments.tagGen,
+  set: v => (settings.assignments.tagGen = v),
+});
+const TAG_GEN_OPTIONS = computed(() => [
+  { value: '', label: '跟随主 API' },
+  ...settings.channels.map(c => ({ value: c.id, label: c.name || '未命名渠道' })),
+]);
 
 /* —— 渠道:列表只读展示,编辑/新建都在弹窗里进行,避免一长列表平铺误触。
    渠道列表与柏宝书共享(见 state/settings.ts 的共享存储),任一端改动自动同步。 —— */
@@ -101,6 +119,7 @@ function normalizeAutoTagNumbers(changed?: 'minImages' | 'maxImages' | Event) {
 
 const promptManagerOpen = ref(false);
 const currentActivePreset = computed(() => activePromptPreset());
+
 
 
 // 排除参数:内部存 string[],编辑时用逗号分隔的单行文本承载,读/写两向转换。
@@ -462,6 +481,15 @@ async function confirmUpdate() {
           开启后图片默认收成一条细条,点击才展开,适合在外面玩时防窥。在卡片上手动展开/折叠过的以手动状态为准(刷新页面后重置)。
         </p>
 
+        <div class="bbi-select-row">
+          <span class="bbi-field-label">楼层图片显示大小</span>
+          <BbiSelect v-model="imageDisplaySel" :options="IMAGE_DISPLAY_OPTIONS" aria-label="楼层图片显示大小" />
+        </div>
+        <p class="bbi-field-hint">
+          只管图片在聊天里显示多大,主要针对电脑宽屏;不改出图分辨率与横竖,也不改图片文件本身。
+          手机等窄屏本来就由宽度限住,基本不受影响。「铺满楼层宽度」即旧版效果。
+        </p>
+
         <label class="bbi-switch-row">
           <span class="bbi-field-label">移动端点当前页导航关窗</span>
           <input v-model="ui.navTapClose" type="checkbox" class="bbi-checkbox" />
@@ -526,13 +554,10 @@ async function confirmUpdate() {
       <Collapsible title="副 API" :open="false">
         <!-- 任务指派:只有一个任务——生成 tag -->
         <div class="bbi-field bbi-assign">
-          <label class="bbi-assign-row">
+          <div class="bbi-assign-row">
             <span class="bbi-field-label">生成 tag 使用</span>
-            <select v-model="settings.assignments.tagGen" class="bbi-input bbi-select">
-              <option value="">跟随主 API</option>
-              <option v-for="c in settings.channels" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-          </label>
+            <BbiSelect v-model="tagGenSel" :options="TAG_GEN_OPTIONS" aria-label="生成 tag 使用的 API 渠道" />
+          </div>
         </div>
         <p class="bbi-field-hint">不指派渠道时跟随主 API:直接借用你主界面当前正在用的 API(聊天补全/文本补全)来生成画图 tag,无需额外配置。想用不同模型再在下方建副渠道指派。渠道列表与柏宝书共享,任一端改动都会自动同步到另一端。</p>
 
@@ -935,11 +960,6 @@ async function confirmUpdate() {
           <span class="bbi-modal-label">流式传输</span>
           <input v-model="editingChannel.stream" type="checkbox" class="bbi-checkbox" />
         </label>
-        <label class="bbi-switch-row">
-          <span class="bbi-modal-label">发送预填充</span>
-          <input v-model="editingChannel.prefill" type="checkbox" class="bbi-checkbox" />
-        </label>
-        <span class="bbi-field-hint">默认开。若副 API 报错信息里出现 prefill 字样,关掉它即可。</span>
         <label class="bbi-modal-field">
           <span class="bbi-modal-label">排除参数</span>
           <input
@@ -1117,9 +1137,13 @@ async function confirmUpdate() {
   justify-content: space-between;
   gap: 12px;
 }
-/* 指派下拉:比全局 bbi-select 更窄小一号,与右侧对齐、不撑满半行(柏宝书同款) */
-.bbi-assign-row .bbi-select {
+/* 指派下拉:比全局 BbiSelect 更窄小一号,与右侧对齐、不撑满半行(柏宝书同款)。
+   BbiSelect 自带 180px 固定宽,这里收窄并放开 max-width 以适应移动端。 */
+.bbi-assign-row :deep(.bbi-select-box) {
+  width: 160px;
   max-width: 60%;
+}
+.bbi-assign-row :deep(.bbi-select-trigger) {
   font-size: 12px;
 }
 

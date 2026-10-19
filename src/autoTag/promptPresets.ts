@@ -161,15 +161,6 @@ export const BUILTIN_NAI_SINGLE_PRESET: PromptPreset = {
       builtin: true,
       markerKey: 'target',
     },
-    {
-      id: 'prefill',
-      name: '预填充',
-      enabled: true,
-      role: 'assistant',
-      kind: 'text',
-      builtin: true,
-      content: DEFAULT_PREFILL_PROMPT,
-    },
   ],
 };
 
@@ -594,15 +585,6 @@ export const BUILTIN_COMFY_SINGLE_PRESET: PromptPreset = {
       kind: 'marker',
       builtin: true,
       markerKey: 'target',
-    },
-    {
-      id: 'prefill',
-      name: '预填充',
-      enabled: true,
-      role: 'assistant',
-      kind: 'text',
-      builtin: true,
-      content: DEFAULT_PREFILL_PROMPT,
     },
   ],
 };

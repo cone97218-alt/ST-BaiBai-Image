@@ -5,7 +5,12 @@ import {
   type ComfySimpleConfig,
 } from '@/backends/comfyTemplates';
 import { BUILTIN_NAI_ARTISTS, isBuiltinNaiArtist, naiDefaultUndesired } from '@/backends/nai';
-import { parseSize, type SizePair } from '@/backends/size';
+import {
+  normalizeOrientationLock,
+  parseSize,
+  type OrientationLock,
+  type SizePair,
+} from '@/backends/size';
 import {
   clampVibeStrength,
   saveVibeFiles,
@@ -73,6 +78,8 @@ export interface ComfyWorkflowPreset extends SizePair {
   simple: ComfySimpleConfig;
   /** 生成自然语言:开=自动 tag 以连贯短句写正向提示词(Flux/SD3.5 等);关=逗号分隔 tag。 */
   naturalLanguage: boolean;
+  /** 画幅锁:auto = 由自动 tag 判定横竖;portrait/landscape = 这套工作流一律出该方向(见 size.ts)。 */
+  orientationLock: OrientationLock;
 }
 
 /**
@@ -294,6 +301,17 @@ export interface NaiSettings extends BackendConn {
    * 他没选过的画风,每张图都变样却查不出原因。
    */
   activeArtistId: string;
+  /**
+   * 生成自然语言(仅 4.5/V5 有意义,默认开 = 改动前的行为):开 = 自动 tag 为 Base 与每个角色
+   * 写英文 nl;关 = 只写 tag。与 ComfyUI 工作流的同名开关同一口径——**只管 AI 写不写,
+   * 不管发不发**:tag 里已有的 nl 照常发送(想对比就清掉 nl 或「AI 重写提示词」)。
+   * 关它不影响原生多角色提示(characters[]),那是模型能力,不是写法。
+   * 存在理由:4.5 的提示词预算(约 512 token,Base 与全部角色共用)比 V5 紧得多,
+   * nl 是最大头,超了会被截断、画面跟着走样。
+   */
+  naturalLanguage: boolean;
+  /** 画幅锁(渠道级,面板上与横竖尺寸并排);语义见 size.ts 的 OrientationLock。 */
+  orientationLock: OrientationLock;
 }
 
 /** 界面偏好里要跨设备同步的部分;activePage 等纯本机临时态不在此。 */
@@ -330,6 +348,31 @@ export interface UiPrefs {
    * 只是「默认」——卡片上手动展开/折叠过的槽位以手动状态为准(会话内,见 floor/collapseState.ts)。
    */
   autoCollapseImages: boolean;
+  /**
+   * 楼层图片显示大小(合法值见 IMAGE_DISPLAY_SIZES)。只管聊天里显示多大,
+   * 与出图分辨率、横竖方向无关,生成的文件一字节不变。
+   */
+  imageDisplaySize: ImageDisplaySize;
+}
+
+/** 楼层图片显示大小。 */
+export type ImageDisplaySize = 'small' | 'medium' | 'large' | 'full';
+
+/**
+ * 显示大小选项(顺序即下拉顺序)。封的是**高度**而不是宽度:PC 上嫌大的,是竖图铺满
+ * 楼层宽度后比一屏还高;按宽度封顶,竖图照样高,横图反倒被压得过小。宽度随原图比例,
+ * 且始终不超过楼层宽度——窄屏(手机竖屏)上竖图本来就矮于 600px,默认档基本无感。
+ */
+export const IMAGE_DISPLAY_SIZES: { value: ImageDisplaySize; label: string; maxHeight: number | null }[] = [
+  { value: 'small', label: '小（高度不超过 400px）', maxHeight: 400 },
+  { value: 'medium', label: '中（高度不超过 600px）', maxHeight: 600 },
+  { value: 'large', label: '大（高度不超过 800px）', maxHeight: 800 },
+  { value: 'full', label: '铺满楼层宽度（不限高度）', maxHeight: null },
+];
+
+/** 显示大小 → 图片显示高度上限(px);null = 不封顶,铺满楼层宽度(0.3.0 及以前的样子)。 */
+export function imageDisplayMaxHeight(size: ImageDisplaySize): number | null {
+  return IMAGE_DISPLAY_SIZES.find(option => option.value === size)?.maxHeight ?? null;
 }
 
 /**
@@ -355,9 +398,6 @@ export interface ApiChannel {
   timeoutSec: number;
   /** 流式传输(默认关);开启后按 SSE 增量拼接 */
   stream: boolean;
-  /** 发送预填充(默认开)。请求末尾带一条 assistant 预填充消息,引导模型续写并压制拒答;
-   *  端点要求「最后一条必须是 user」或不支持预填充时可关。 */
-  prefill: boolean;
   /** 排除参数:这些字段名会在构造请求体时从 body 中删除,
    *  用于规避不接受某些参数(如 temperature/max_tokens)的兼容端点报错。 */
   excludeParams: string[];
@@ -440,7 +480,7 @@ export interface AutoTagSettings {
   activePresetId?: string;
   /** 按后端与模式记录的独立激活预设映射表(key: `${backend}:${mode}`, 如 'nai:single', 'nai:comic', 'comfyui:single') */
   activePresetMap?: Record<string, string>;
-  /** 可编辑提示词集(存量兼容字段,保留用于向后兼容与回滚)。 */
+  /** 可编辑提示词集(破限/后端规范/思维链);空串 = 回落内置默认。 */
   prompts: AutoTagPrompts;
 }
 
@@ -494,9 +534,6 @@ export interface AutoTagPrompts {
   /** NAI 思维链(4.5/V5);留空回落内置默认(DEFAULT_NAI_V5_THINKING)。
    *  槽位块是 Base + 每角色块,与 comfy 那份的单串形态不同,不可互换。 */
   naiV5Thinking: string;
-  /** assistant 预填充,以 <thinking> 开头引导模型从思维链续写;随渠道「发送预填充」开关生效;
-   *  留空回落内置默认(DEFAULT_PREFILL_PROMPT)。 */
-  prefill: string;
 }
 
 export interface ImageSettings {
@@ -568,6 +605,7 @@ export function newComfyWorkflow(name = DEFAULT_WORKFLOW_NAME): ComfyWorkflowPre
     naturalLanguage: false,
     portraitSize: DEFAULT_PORTRAIT_SIZE,
     landscapeSize: DEFAULT_LANDSCAPE_SIZE,
+    orientationLock: 'auto',
   };
 }
 
@@ -636,6 +674,8 @@ function naiDefaults(): NaiSettings {
     // hydrate 时旧用户的 stored.nai.activeArtistId 已存在(哪怕空串),会被
     // normalizeNai 原样保留,不受影响。
     activeArtistId: BUILTIN_NAI_ARTISTS[0]?.id ?? '',
+    naturalLanguage: true,
+    orientationLock: 'auto',
   };
 }
 
@@ -655,6 +695,7 @@ function defaults(): ImageSettings {
       orbSize: 48,
       cardTheme: 'st',
       autoCollapseImages: false,
+      imageDisplaySize: 'medium',
     },
     // 出图后端默认 ComfyUI(当前唯一实现的出图后端);webui 渠道已隐藏,不再作为可选值
     defaultBackend: 'comfyui',
@@ -681,7 +722,6 @@ function defaults(): ImageSettings {
         comfyThinking: '',
         naiThinking: '',
         naiV5Thinking: '',
-        prefill: '',
       },
     },
     excludes: excludesDefaults(),
@@ -706,7 +746,6 @@ function normalizeChannel(c: Partial<ApiChannel>): ApiChannel {
         ? Math.floor(c.timeoutSec)
         : 180,
     stream: typeof c.stream === 'boolean' ? c.stream : false,
-    prefill: typeof c.prefill === 'boolean' ? c.prefill : true,
     excludeParams: Array.isArray(c.excludeParams)
       ? c.excludeParams.filter((x): x is string => typeof x === 'string')
       : [],
@@ -727,7 +766,6 @@ export function newChannel(): ApiChannel {
     maxTokens: 65535,
     timeoutSec: 180,
     stream: false,
-    prefill: true,
     excludeParams: [],
     reasoningEffort: '',
   };
@@ -751,6 +789,26 @@ export function getTagGenChannel(): ApiChannel | null {
 export function activeComfyPreset(): ComfyWorkflowPreset {
   const list = settings.comfyui.workflows;
   return list.find(w => w.id === settings.comfyui.activeWorkflowId) ?? list[0] ?? newComfyWorkflow();
+}
+
+/** 画幅锁选项(顺序即分段按钮顺序);NAI 渠道与 ComfyUI 每套工作流的面板共用这一份。 */
+export const ORIENTATION_LOCKS: { value: OrientationLock; label: string }[] = [
+  { value: 'auto', label: '自动' },
+  { value: 'portrait', label: '竖屏' },
+  { value: 'landscape', label: '横屏' },
+];
+
+/**
+ * 当前出图后端的画幅锁:NAI 取渠道级那一份,ComfyUI 取当前工作流预设那一份;其余后端不锁。
+ *
+ * 出图(generate.ts)、自动 tag 协议与收尾(autoTag/prompt.ts、runner.ts)、卡片占位与
+ * 提示词编辑弹窗都从这里取——判据只此一处,免得「协议说锁竖、出图却按 tag 出横」。
+ * 同样刻意只读不写(在 computed 里被调用)。
+ */
+export function activeOrientationLock(): OrientationLock {
+  if (settings.defaultBackend === 'nai') return settings.nai.orientationLock;
+  if (settings.defaultBackend === 'comfyui') return activeComfyPreset().orientationLock;
+  return 'auto';
 }
 
 /**
@@ -861,6 +919,7 @@ function normalizeWorkflowPreset(raw: unknown, seq: number): ComfyWorkflowPreset
     naturalLanguage: typeof o.naturalLanguage === 'boolean' ? o.naturalLanguage : false,
     portraitSize: size(o.portraitSize, DEFAULT_PORTRAIT_SIZE),
     landscapeSize: size(o.landscapeSize, DEFAULT_LANDSCAPE_SIZE),
+    orientationLock: normalizeOrientationLock(o.orientationLock),
   };
 }
 
@@ -1100,7 +1159,7 @@ function normalizeNai(raw: unknown, def: NaiSettings): NaiSettings {
   // 清成空串同时让 activeArtistId ∈ {'', 用户库 id, 内置库 id} 成为不变式,面板无需再判悬空。
   const activeArtistId =
     typeof o.activeArtistId === 'string' &&
-    (artistPresets.some(a => a.id === o.activeArtistId) || isBuiltinNaiArtist(o.activeArtistId))
+      (artistPresets.some(a => a.id === o.activeArtistId) || isBuiltinNaiArtist(o.activeArtistId))
       ? o.activeArtistId
       : '';
 
@@ -1136,6 +1195,9 @@ function normalizeNai(raw: unknown, def: NaiSettings): NaiSettings {
       : def.vibes,
     artistPresets,
     activeArtistId,
+    // 老配置缺这两个字段:回落默认 = 开着自然语言、不锁方向,即改动前的行为
+    naturalLanguage: typeof o.naturalLanguage === 'boolean' ? o.naturalLanguage : def.naturalLanguage,
+    orientationLock: normalizeOrientationLock(o.orientationLock),
   };
 }
 
@@ -1212,6 +1274,10 @@ function normalize(raw: unknown): ImageSettings {
     cardTheme: typeof ru.cardTheme === 'string' ? ru.cardTheme : d.ui.cardTheme,
     autoCollapseImages:
       typeof ru.autoCollapseImages === 'boolean' ? ru.autoCollapseImages : d.ui.autoCollapseImages,
+    // 老配置缺字段 → 默认档(中)。不为「保持铺满」做迁移:铺满正是要修的问题,想要回去下拉里选
+    imageDisplaySize: IMAGE_DISPLAY_SIZES.some(option => option.value === ru.imageDisplaySize)
+      ? (ru.imageDisplaySize as ImageDisplaySize)
+      : d.ui.imageDisplaySize,
   };
   // webui 已隐藏:存量数据里的 'webui' 一律迁移到默认后端(否则规范/出图口径会落空)
   merged.defaultBackend =
@@ -1267,7 +1333,6 @@ function normalize(raw: unknown): ImageSettings {
         comfyThinking: typeof rp.comfyThinking === 'string' ? rp.comfyThinking : legacyThinking,
         naiThinking: typeof rp.naiThinking === 'string' ? rp.naiThinking : legacyThinking,
         naiV5Thinking: typeof rp.naiV5Thinking === 'string' ? rp.naiV5Thinking : '',
-        prefill: typeof rp.prefill === 'string' ? rp.prefill : '',
       };
       const comicMode = typeof rt.comicMode === 'boolean' ? rt.comicMode : false;
       const { presets, activePresetId, activePresetMap } = normalizePromptPresets(
