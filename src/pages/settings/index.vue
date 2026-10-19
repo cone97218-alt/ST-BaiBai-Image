@@ -475,6 +475,14 @@ async function confirmUpdate() {
         <p class="bbi-field-hint">在酒馆顶部导航栏加一个快速打开柏宝绘的按钮。左下角魔杖入口照旧保留。</p>
 
         <label class="bbi-switch-row">
+          <span class="bbi-field-label">在快速回复栏显示按钮</span>
+          <input v-model="ui.showQuickReply" type="checkbox" class="bbi-checkbox" />
+        </label>
+        <p class="bbi-field-hint">
+          在输入框上方快速回复栏（QR）加一个快速打开柏宝绘的按钮。需要开启酒馆的快速回复扩展。
+        </p>
+
+        <label class="bbi-switch-row">
           <span class="bbi-field-label">显示屏幕悬浮球</span>
           <input v-model="ui.showOrb" type="checkbox" class="bbi-checkbox" />
         </label>

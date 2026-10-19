@@ -10,6 +10,7 @@ import { hydrateSettings } from '@/state/settings';
 import { ui } from '@/state/ui';
 import { guardEditableArrowKeys } from '@/st/keyboard';
 import { ensureImageTagRegexRegistered } from '@/st/imageTagRegex';
+import { syncQuickReplyButton } from '@/quickReply';
 import { syncTopBarButton } from '@/topbar';
 import { checkForUpdate } from '@/update';
 import { versionedAssetUrl } from '@/version';
@@ -87,6 +88,12 @@ $(() => {
   watch(
     () => ui.showTopBar,
     on => syncTopBarButton(on),
+  );
+  // 快速回复栏按钮:按开关注入/移除,MutationObserver 监控 #send_form
+  syncQuickReplyButton(ui.showQuickReply);
+  watch(
+    () => ui.showQuickReply,
+    on => syncQuickReplyButton(on),
   );
   // 等 ST 的 getContext 就绪后再 hydrate 设置(加载顺序不确定时轮询)
   hydrateWhenReady();

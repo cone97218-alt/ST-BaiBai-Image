@@ -116,7 +116,8 @@ src/
 ├── pool.ts           # 限并发 map(mapLimit,返回顺序=输入顺序);图库量体积/批量删图用
 ├── menu.ts           # 魔杖菜单入口注入(轮询等懒加载)
 ├── topbar.ts         # ST 顶栏快速打开按钮(受 ui.showTopBar 开关控制)
-└── version.ts        # 版本号(__BBI_VERSION__)+ 带 ver 的资源 URL
+├── quickReply.ts     # 快速回复栏按钮(#qr--bar > .qr--buttons,MutationObserver 监控 #send_form,受 ui.showQuickReply 控制)
+├── version.ts        # 版本号(__BBI_VERSION__)+ 带 ver 的资源 URL
 └── update.ts         # 更新检测:远端 manifest 版本对比 + /api/extensions/update 自动更新
 ```
 
@@ -159,7 +160,7 @@ src/
 | `globalThis.STBaiBaiImage` + window 事件 | public/register.ts | **我们自己挂出去的**公开接口(§9);`st-baibai-image:ready` / `:changed` 派发在 window 上 |
 | HTTP 代理 | api/client.ts、backends/comfyui.ts、floor/upload.ts、st/images.ts | `/api/backends/chat-completions/generate`、`/api/backends/chat-completions/status`、`/api/sd/comfy/*`、`/api/files/upload|delete`、`/api/images/upload|delete|folders|list` |
 | 扩展更新 API | src/update.ts | `GET /api/extensions/discover`(查类型)+ `POST /api/extensions/update`(自动更新);远端版本读 GitHub raw manifest.json(8s 超时,失败静默) |
-| 注入 DOM | menu.ts、topbar.ts、floor/actionButton.ts | 魔杖菜单 / 顶栏按钮 / 楼层按钮(不进 shadow) |
+| 注入 DOM | menu.ts、topbar.ts、quickReply.ts、floor/actionButton.ts | 魔杖菜单 / 顶栏按钮 / 快速回复栏按钮 / 楼层按钮(不进 shadow) |
 
 注意:三处 UI 的隔离层次不同,样式约定各不一样 ——
 - 设置窗口:整个 Vue 应用挂在一个大 shadow root(`#bbi-app-host`),样式走 dist/index.css;
@@ -891,7 +892,7 @@ API 对象 `Object.freeze`,一个插件改不动下一个插件拿到的东西�
 | 卡片版面 / 按钮尺寸基线 / 卡片主题 | src/floor/card.css + cardStyles.ts(令牌来自 styles/theme.css) |
 | 结果存储 / 文件命名 / CAS | src/floor/storage.ts + src/st/images.ts(外部图落盘走同文件的 `saveExternalImage`,与楼层图共用目录/文件名/侧写规则) |
 | 显示/提示词两侧的正则 | src/st/imageTagRegex.ts(提示词展示全文口径 `formatPromptText`,卡片与图库共用) |
-| 楼层按钮 / 顶栏按钮 / 魔杖入口 | src/floor/actionButton.ts / src/topbar.ts / src/menu.ts |
+| 楼层按钮 / 顶栏按钮 / 快速回复栏按钮 / 魔杖入口 | src/floor/actionButton.ts / src/topbar.ts / src/quickReply.ts / src/menu.ts |
 | 正文写回(含竞态) | src/st/messageEdit.ts |
 | 请求历史(LLM/生图,内存不持久化) | src/state/history.ts(store)+ src/pages/history/index.vue(页面)+ src/api/client.ts 埋点 |
 | 复制到剪贴板 | src/st/clipboard.ts 的 copyText |

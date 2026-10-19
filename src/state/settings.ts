@@ -306,6 +306,8 @@ export interface UiPrefs {
   navTapClose: boolean;
   /** 在 ST 顶栏注入一个快速打开按钮(魔杖菜单入口照旧保留)。默认关。 */
   showTopBar: boolean;
+  /** 在快速回复栏(#qr--bar > .qr--buttons)注入快速打开按钮。默认关。 */
+  showQuickReply: boolean;
   /** 屏幕边缘悬浮球,点击打开柏宝绘。默认关。 */
   showOrb: boolean;
   /** 悬浮球自定义图标(ST 服务器图片路径;空=默认画笔图标)。跨设备同步。 */
@@ -645,6 +647,7 @@ function defaults(): ImageSettings {
       navPosition: 'auto',
       navTapClose: true,
       showTopBar: false,
+      showQuickReply: false,
       showOrb: false,
       orbImage: '',
       orbShape: 'bookmark',
@@ -1191,6 +1194,8 @@ function normalize(raw: unknown): ImageSettings {
     navPosition: typeof ru.navPosition === 'string' ? ru.navPosition : d.ui.navPosition,
     navTapClose: typeof ru.navTapClose === 'boolean' ? ru.navTapClose : d.ui.navTapClose,
     showTopBar: typeof ru.showTopBar === 'boolean' ? ru.showTopBar : d.ui.showTopBar,
+    showQuickReply:
+      typeof ru.showQuickReply === 'boolean' ? ru.showQuickReply : d.ui.showQuickReply,
     showOrb: typeof ru.showOrb === 'boolean' ? ru.showOrb : d.ui.showOrb,
     orbImage: typeof ru.orbImage === 'string' ? ru.orbImage : d.ui.orbImage,
     orbShape: typeof ru.orbShape === 'string' ? ru.orbShape : d.ui.orbShape,

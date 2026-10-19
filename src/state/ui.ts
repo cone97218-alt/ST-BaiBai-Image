@@ -45,6 +45,8 @@ interface UiState {
   navTapClose: boolean;
   /** 在 ST 顶栏注入快速打开按钮(默认关) */
   showTopBar: boolean;
+  /** 在快速回复栏注入快速打开按钮(默认关) */
+  showQuickReply: boolean;
   /** 屏幕边缘悬浮球(默认关) */
   showOrb: boolean;
   /** 悬浮球自定义图标(ST 服务器图片路径;空=默认画笔图标) */
@@ -96,6 +98,7 @@ export const ui = reactive<UiState>({
   navPosition: validNav(settings.ui.navPosition),
   navTapClose: settings.ui.navTapClose,
   showTopBar: settings.ui.showTopBar,
+  showQuickReply: settings.ui.showQuickReply,
   showOrb: settings.ui.showOrb,
   orbImage: settings.ui.orbImage,
   orbShape: validOrbShape(settings.ui.orbShape),
@@ -109,6 +112,7 @@ onSettingsReady(() => {
   ui.navPosition = validNav(settings.ui.navPosition);
   ui.navTapClose = settings.ui.navTapClose;
   ui.showTopBar = settings.ui.showTopBar;
+  ui.showQuickReply = settings.ui.showQuickReply;
   ui.showOrb = settings.ui.showOrb;
   ui.orbImage = settings.ui.orbImage;
   ui.orbShape = validOrbShape(settings.ui.orbShape);
@@ -123,6 +127,7 @@ watch(
     ui.navPosition,
     ui.navTapClose,
     ui.showTopBar,
+    ui.showQuickReply,
     ui.showOrb,
     ui.orbImage,
     ui.orbShape,
@@ -134,6 +139,7 @@ watch(
     settings.ui.navPosition = ui.navPosition;
     settings.ui.navTapClose = ui.navTapClose;
     settings.ui.showTopBar = ui.showTopBar;
+    settings.ui.showQuickReply = ui.showQuickReply;
     settings.ui.showOrb = ui.showOrb;
     settings.ui.orbImage = ui.orbImage;
     settings.ui.orbShape = ui.orbShape;
